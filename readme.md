@@ -5,266 +5,157 @@
 
 ### Ход выполнения практической работы:
 Вариант 2. Планировщик заданий с вибрацией. То же, что и вариант 1, но вместо уведомления (или вместе с ним) устройство вибрирует по определённому паттерну.
-#### 1. Подготовка манифеста
-```xml
-    <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission
-        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="28" />
-```
-#### 2. Запрос разрешений во время выполнения
-MainActivity.java:
+#### 1. Запрос разрешений во время выполнения
+![img_1.png](img_1.png)
+#### 2. Создание уведомления
+За разрешением последовал звук
+
+![img.png](img.png)
+#### 3. Предварительный просмотр камеры
+![img_2.png](img_2.png)
+#### 3. Вибрация
+Тоже работает
+
+### Индивидуальное задание (Вариант 2. Планировщик заданий с вибрацией):
+MainActivity.java
 ```java
-public class MainActivity extends AppCompatActivity {
+// ...
+private static final int REQUEST_CODE_NOTIFICATIONS = 100;
+private EditText etSeconds;
 
-    private static final int REQUEST_CODE_CAMERA = 100;
+protected void onCreate(Bundle savedInstanceState) {
+    // ...
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+    etSeconds = findViewById(R.id.etSeconds);
+    Button btnStart = findViewById(R.id.btnStart);
 
-        Button btnCamera = findViewById(R.id.btnCamera);
-        btnCamera.setOnClickListener(v -> checkCameraPermission());
+    btnStart.setOnClickListener(v -> scheduleTask());
+}
+
+//...
+
+private void scheduleTask() {
+    String text = etSeconds.getText().toString();
+
+    if (text.isEmpty()) {
+        Toast.makeText(this, "Введите количество секунд", Toast.LENGTH_SHORT).show();
+        return;
     }
 
-    private void checkCameraPermission() {
+    int seconds = Integer.parseInt(text);
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-                == PackageManager.PERMISSION_GRANTED) {
-            openCameraActivity();
-        } else {
+    Intent intent = new Intent(this, AlarmReceiver.class);
 
-            if (ActivityCompat.shouldShowRequestPermissionRationale(this,
-                    Manifest.permission.CAMERA)) {
-                Toast.makeText(this,
-                        "Разрешение нужно для камеры",
-                        Toast.LENGTH_SHORT).show();
-            }
+    PendingIntent pendingIntent = PendingIntent.getBroadcast(
+            this,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+    );
 
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.CAMERA},
-                    REQUEST_CODE_CAMERA);
-        }
+    AlarmManager alarmManager =
+            (AlarmManager) getSystemService(ALARM_SERVICE);
+
+    long triggerTime = System.currentTimeMillis() + seconds * 1000L;
+
+    if (alarmManager != null) {
+        alarmManager.set(
+                AlarmManager.RTC_WAKEUP,
+                triggerTime,
+                pendingIntent
+        );
     }
 
-    private void openCameraActivity() {
-        startActivity(new Intent(this, CameraActivity.class));
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode,
-                                           @NonNull String[] permissions,
-                                           @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-
-        if (requestCode == REQUEST_CODE_CAMERA) {
-            if (grantResults.length > 0 &&
-                    grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                openCameraActivity();
-            } else {
-                Toast.makeText(this,
-                        "Нет доступа к камере",
-                        Toast.LENGTH_LONG).show();
-            }
-        }
-    }
+    Toast.makeText(this,
+            "Задача запланирована через " + seconds + " сек.",
+            Toast.LENGTH_LONG).show();
 }
 ```
-Результат:
-
-![img_1.png](img_1.png)
-#### 3. Создание уведомления
-MainActivity.java:
+AlarmReceiver.java
 ```java
-public class MainActivity extends AppCompatActivity {
+public class AlarmReceiver extends BroadcastReceiver {
 
-    private static final int REQUEST_CODE_CAMERA = 100;
-    private static final String CHANNEL_ID = "CHANNEL_ID";
-    private static final int NOTIF_ID = 1;
-    private static final int REQUEST_CODE_NOTIF = 200;
+    private static final String CHANNEL_ID = "TASK_CHANNEL";
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-
-        Button btnCamera = findViewById(R.id.btnCamera);
-        Button btnNotify = findViewById(R.id.btnNotify);
-
-        btnCamera.setOnClickListener(v -> checkCameraPermission());
-        btnNotify.setOnClickListener(v -> checkNotificationPermissionAndSend());
+    public void onReceive(Context context, Intent intent) {
+        vibrate(context);
+        sendNotification(context);
     }
 
-    private void checkCameraPermission() {
+    private void vibrate(Context context) {
+        Vibrator vibrator =
+                (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-                == PackageManager.PERMISSION_GRANTED) {
-            openCameraActivity();
-        } else {
+        if (vibrator != null && vibrator.hasVibrator()) {
+            long[] pattern = {0, 500, 1000, 500};
 
-            if (ActivityCompat.shouldShowRequestPermissionRationale(this,
-                    Manifest.permission.CAMERA)) {
-                Toast.makeText(this,
-                        "Разрешение нужно для камеры",
-                        Toast.LENGTH_SHORT).show();
-            }
-
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.CAMERA},
-                    REQUEST_CODE_CAMERA);
-        }
-    }
-
-    private void openCameraActivity() {
-        startActivity(new Intent(this, CameraActivity.class));
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode,
-                                           @NonNull String[] permissions,
-                                           @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-
-        if (requestCode == REQUEST_CODE_NOTIF) {
-            if (grantResults.length > 0 &&
-                    grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                sendNotification();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(
+                        VibrationEffect.createWaveform(pattern, -1)
+                );
             } else {
-                Toast.makeText(this,
-                        "Нет разрешения на уведомления",
-                        Toast.LENGTH_SHORT).show();
+                vibrator.vibrate(pattern, -1);
             }
         }
     }
 
-    private void createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID,
-                    "Reminders",
-                    NotificationManager.IMPORTANCE_DEFAULT
-            );
+    private void sendNotification(Context context) {
+        createNotificationChannel(context);
 
-            NotificationManager manager = getSystemService(NotificationManager.class);
+        Intent intent = new Intent(context, MainActivity.class);
+
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+                context,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+
+        NotificationCompat.Builder builder =
+                new NotificationCompat.Builder(context, CHANNEL_ID)
+                        .setSmallIcon(android.R.drawable.ic_dialog_info)
+                        .setContentTitle("Напоминание")
+                        .setContentText("Пора выполнить задачу")
+                        .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                        .setAutoCancel(true)
+                        .setContentIntent(pendingIntent);
+
+        NotificationManagerCompat notificationManager =
+                NotificationManagerCompat.from(context);
+
+        notificationManager.notify(1, builder.build());
+    }
+
+    private void createNotificationChannel(Context context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel =
+                    new NotificationChannel(
+                            CHANNEL_ID,
+                            "Task Channel",
+                            NotificationManager.IMPORTANCE_DEFAULT
+                    );
+
+            NotificationManager manager =
+                    context.getSystemService(NotificationManager.class);
+
             if (manager != null) {
                 manager.createNotificationChannel(channel);
             }
         }
     }
-
-    private void sendNotification() {
-        createNotificationChannel();
-
-        NotificationCompat.Builder builder =
-                new NotificationCompat.Builder(this, CHANNEL_ID)
-                        .setSmallIcon(android.R.drawable.ic_dialog_info)
-                        .setContentTitle("Напоминание")
-                        .setContentText("Пришло время выполнить задачу")
-                        .setAutoCancel(true)
-                        .setPriority(NotificationCompat.PRIORITY_DEFAULT);
-
-        NotificationManagerCompat.from(this).notify(NOTIF_ID, builder.build());
-    }
-
-    private void checkNotificationPermissionAndSend() {
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-
-            if (ContextCompat.checkSelfPermission(this,
-                    Manifest.permission.POST_NOTIFICATIONS)
-                    == PackageManager.PERMISSION_GRANTED) {
-
-                sendNotification();
-
-            } else {
-
-                ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.POST_NOTIFICATIONS},
-                        REQUEST_CODE_NOTIF);
-            }
-
-        } else {
-            sendNotification();
-        }
-    }
 }
 ```
-Результат (за разрешением последовал звук):
 
-![img.png](img.png)
-#### 4. Управление вибрацией
-MainActivity.java:
-```java
+Интерфейс:
 
-```
-#### 5. Предварительный просмотр камеры
-activity_camera.xml:
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent">
+![img_3.png](img_3.png)
 
-    <SurfaceView
-        android:id="@+id/surfaceView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"/>
+Уведомление:
 
-</FrameLayout>
-```
-CameraActivity.java:
-```java
-public class CameraActivity extends AppCompatActivity implements SurfaceHolder.Callback {
+![img_4.png](img_4.png)
 
-    private Camera camera;
-    private SurfaceHolder holder;
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_camera);
-
-        SurfaceView surfaceView = findViewById(R.id.surfaceView);
-        holder = surfaceView.getHolder();
-        holder.addCallback(this);
-    }
-
-    @Override
-    public void surfaceCreated(@NonNull SurfaceHolder holder) {
-        try {
-            camera = Camera.open();
-            camera.setPreviewDisplay(holder);
-            camera.setDisplayOrientation(90);
-            camera.startPreview();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    @Override
-    public void surfaceChanged(@NonNull SurfaceHolder holder, int format, int width, int height) {
-        if (camera != null) {
-            camera.stopPreview();
-            camera.startPreview();
-        }
-    }
-
-    @Override
-    public void surfaceDestroyed(@NonNull SurfaceHolder holder) {
-        if (camera != null) {
-            camera.stopPreview();
-            camera.release();
-            camera = null;
-        }
-    }
-}
-```
-Результат:
-
-![img_2.png](img_2.png)
+Через 5 секунд вибрация
 ### Контрольные вопросы:
 1. Нормальные и опасные разрешения
 - Normal permissions - автоматически выдаются системой, не требуют запроса у пользователя. 
